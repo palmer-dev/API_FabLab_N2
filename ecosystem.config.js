@@ -11,6 +11,6 @@ module.exports = {
       NODE_ENV: "development"
     },
     "max_memory_restart": "4G",
-    "autorestart": false
+    "autorestart": true
   }]
 }

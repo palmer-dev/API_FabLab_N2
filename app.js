@@ -45,15 +45,41 @@ app.post('/add-mesures', function (req, res) {
         fs.writeFile("./out/mesures.json", str, () => {
         });
         io.emit('newValue', toInsert);
-        res.send("");
+    })
+    res.status(200).end();
+})
+
+app.post('/add-gps', function (req, res) {
+    fs.readFile("./out/gps.json", (err, data) => {
+        const json = JSON.parse(data);
+        const toInsert = req.body;
+        toInsert.timestamp = new Date();
+        console.log(toInsert);
+        json.data.push(toInsert);
+        const str = JSON.stringify(json);
+        fs.writeFile("./out/gps.json", str, () => {
+        });
+        io.emit('satUpdated', toInsert);
+    })
+    res.status(200).end();
+})
+
+app.get('/data/:dateDebut?', function (req, res) {
+    const dateDebut = req.params.dateDebut;
+    console.log(dateDebut);
+    fs.readFile("./out/mesures.json", (err, data) => {
+        const json = JSON.parse(data);
+        let returned = { data: dateDebut != undefined ? json.data.filter((donnee) => donnee.timestamp >= dateDebut) : json.data };
+
+        res.json(returned);
     })
 })
 
-app.get('/data', function (req, res) {
-    fs.readFile("./out/mesures.json", (err, data) => {
-        const json = JSON.parse(data);
-        res.json(json);
-    })
+app.get('/last-infos', function (req, res) {
+    const mesures_data = fs.readFileSync("./out/mesures.json", { encoding: "utf-8" });
+    const mesures_json = JSON.parse(mesures_data);
+    const ret = mesures_json.data[mesures_json.data.length - 1] ?? {}
+    res.json(ret);
 })
 
 app.get('/dashboard', (req, res) => {

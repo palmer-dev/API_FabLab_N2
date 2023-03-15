@@ -1,3 +1,21 @@
 * {
     font-family: system-ui;
 }
+
+.containerGraphe {
+    display: flex;
+    flex-flow: column;
+}
+
+.containerGraphe canva {
+    width: 100px;
+}
+
+.row {
+    display: flex;
+    flex-flow: row;
+}
+
+#map {
+    height: 30vh;
+}
