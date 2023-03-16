@@ -5,6 +5,9 @@ var bodyParser = require('body-parser');
 var app = express();
 var fs = require("fs");
 
+// DB
+const { saveNewMesure, getMesuresForStationId, startConnection } = require("./database/config");
+
 // CERTIFICATE
 const privateKey = fs.readFileSync('./certs/privkey.pem', 'utf8');
 const certificate = fs.readFileSync('./certs/cert.pem', 'utf8');
@@ -19,67 +22,45 @@ const credentials = {
 const httpsServer = https.createServer(credentials, app);
 const io = require("socket.io")(httpsServer);
 
+startConnection();
+
 // parse application/json
 app.use(bodyParser.json())
 
-app.use(function (req, res, next) {
 
+app.use(function (req, res, next) {
     res.append('Access-Control-Allow-Origin', ['*']);
     res.append('Access-Control-Allow-Methods', 'GET,POST');
     res.append('Access-Control-Allow-Headers', 'Content-Type');
-
     console.log("/" + req.method);
-
     next();
 });
 
 app.use("/public", express.static('public'));
 
 app.post('/add-mesures', function (req, res) {
-    fs.readFile("./out/mesures.json", (err, data) => {
-        const json = JSON.parse(data);
-        const toInsert = req.body;
-        toInsert.timestamp = new Date();
-        json.data.push(toInsert);
-        const str = JSON.stringify(json);
-        fs.writeFile("./out/mesures.json", str, () => {
-        });
-        io.emit('newValue', toInsert);
-    })
-    res.status(200).end();
-})
-
-app.post('/add-gps', function (req, res) {
-    fs.readFile("./out/gps.json", (err, data) => {
-        const json = JSON.parse(data);
-        const toInsert = req.body;
-        toInsert.timestamp = new Date();
-        console.log(toInsert);
-        json.data.push(toInsert);
-        const str = JSON.stringify(json);
-        fs.writeFile("./out/gps.json", str, () => {
-        });
-        io.emit('satUpdated', toInsert);
-    })
+    const toInsert = req.body;
+    toInsert.timestamp = new Date();
+    saveNewMesure(toInsert);
+    io.emit('newValue', toInsert);
     res.status(200).end();
 })
 
 app.get('/data/:dateDebut?', function (req, res) {
     const dateDebut = req.params.dateDebut;
     console.log(dateDebut);
-    fs.readFile("./out/mesures.json", (err, data) => {
-        const json = JSON.parse(data);
-        let returned = { data: dateDebut != undefined ? json.data.filter((donnee) => donnee.timestamp >= dateDebut) : json.data };
-
+    getMesuresForStationId().then(mesures => {
+        let returned = { data: dateDebut != undefined ? mesures.filter((donnee) => new Date(donnee.timestamp) >= new Date(new Date(dateDebut).toISOString())) : mesures };
+        console.log(mesures);
         res.json(returned);
-    })
+    });
 })
 
 app.get('/last-infos', function (req, res) {
-    const mesures_data = fs.readFileSync("./out/mesures.json", { encoding: "utf-8" });
-    const mesures_json = JSON.parse(mesures_data);
-    const ret = mesures_json.data[mesures_json.data.length - 1] ?? {}
-    res.json(ret);
+    getMesuresForStationId().then(mesures => {
+        const ret = mesures[mesures.length - 1] ?? {}
+        res.json(ret);
+    })
 })
 
 app.get('/dashboard', (req, res) => {

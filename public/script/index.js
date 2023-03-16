@@ -108,8 +108,10 @@ function updateCharts(newValeurs) {
     humdata.push(newValeurs.Weather.humidity);
     tempdata.push(newValeurs.Weather.temperature);
     pressdata.push(newValeurs.Weather.pressure);
-    altdata.push(newValeurs.Weather.altitude);
+    altdata.push(newValeurs.GPS.alt);
+    GPS.push(newValeurs.GPS);
     refreshCharts();
+    refreshGPS();
 }
 
 function clearCharts() {
@@ -130,9 +132,18 @@ function refreshCharts() {
 
 function refreshGPS() {
     GPS.forEach((gpsPoint, index) => {
-        var marker = L.marker([gpsPoint.lat, gpsPoint.lng]).addTo(map);
-        marker.bindPopup("<b>Mesures</b><br>Température: " + tempdata[index] + "°C<br>Humidité: " + humdata[index] + "%<br>Pression Atmos.: " + pressdata[index] + " hPa")
+        updateOrCreatePoint(gpsPoint, { temperature: tempdata[index], humidity: humdata[index], pression: pressdata[index] });
     });
+    updateFocusMap();
+}
+
+function updateOrCreatePoint(gpsPoint, dataToDislay) {
+    var marker = L.marker([gpsPoint.lat, gpsPoint.lng]).addTo(map);
+    marker.bindPopup("<b>Mesures</b><br>Température: " + dataToDislay.temperature + "°C<br>Humidité: " + dataToDislay.humidity + "%<br>Pression Atmos.: " + dataToDislay.pression + " hPa")
+    updateFocusMap();
+}
+
+function updateFocusMap() {
     const moyLat = GPS.map(gp => gp.lat).filter(val => val != '').reduce((sm, a) => sm + a, 0) / GPS.map(gp => gp.lat).filter(val => val != '').length;
     const moyLng = GPS.map(gp => gp.lng).filter(val => val != '').reduce((sm, a) => sm + a, 0) / GPS.map(gp => gp.lng).filter(val => val != '').length;
     map.setView([moyLat, moyLng], 13);
@@ -165,11 +176,12 @@ function getDataFromAPI(range = 'day') {
     fetch(`https://lab-rey.fr/data/${start}`)
         .then((data) => data.json())
         .then((data) => {
+            console.log(data);
             timestamp.push(...data.data.map(value => new Date(value.timestamp).toLocaleString()));
             humdata.push(...data.data.map(value => value.Weather.humidity))
             tempdata.push(...data.data.map(value => value.Weather.temperature))
             pressdata.push(...data.data.map(value => value.Weather.pressure))
-            altdata.push(...data.data.map(value => value.Weather.altitude))
+            altdata.push(...data.data.map(value => value.GPS.alt))
             GPS.push(...data.data.map(value => value.GPS));
             // Update de tous les graphs
             refreshCharts();
@@ -195,7 +207,7 @@ function getPreviousMonday(fromDate) {
 
 function affichageSat(nbSat) {
     const pToDisplay = document.getElementById("nbSatConnected");
-    pToDisplay.innerText = nbSat;
+    pToDisplay.innerText = nbSat != "" ? nbSat : 0;
     referenceTimeUpdated.nbSat = new Date();
 }
 
