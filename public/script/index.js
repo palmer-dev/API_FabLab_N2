@@ -1,5 +1,9 @@
 var socket = io();
 
+// VARIABLES
+const URL_API = "https://lab-rey.fr";
+
+// SOCKET TEMPS REEL
 socket.on('newValue', function (valeurs) {
     updateCharts(valeurs);
     updateLastInfos(valeurs);
@@ -15,7 +19,7 @@ const tempdata = [];
 const humdata = [];
 const pressdata = [];
 const altdata = [];
-const GPS = [];
+const GPS = {};
 
 range.addEventListener("change", (ev) => {
     const value = ev.target.value;
@@ -109,7 +113,7 @@ function updateCharts(newValeurs) {
     tempdata.push(newValeurs.Weather.temperature);
     pressdata.push(newValeurs.Weather.pressure);
     altdata.push(newValeurs.GPS.alt);
-    GPS.push(newValeurs.GPS);
+    GPS[newValeurs.id] = newValeurs.GPS;
     refreshCharts();
     refreshGPS();
 }
@@ -131,9 +135,9 @@ function refreshCharts() {
 }
 
 function refreshGPS() {
-    GPS.forEach((gpsPoint, index) => {
-        updateOrCreatePoint(gpsPoint, { temperature: tempdata[index], humidity: humdata[index], pression: pressdata[index] });
-    });
+    for (const [idStation, gpsPoint] of Object.entries(GPS)) {
+        updateOrCreatePoint(gpsPoint, { temperature: tempdata[tempdata.length - 1], humidity: humdata[humdata.length - 1], pression: pressdata[pressdata.length - 1] });
+    }
     updateFocusMap();
 }
 
@@ -144,8 +148,8 @@ function updateOrCreatePoint(gpsPoint, dataToDislay) {
 }
 
 function updateFocusMap() {
-    const moyLat = GPS.map(gp => gp.lat).filter(val => val != '').reduce((sm, a) => sm + a, 0) / GPS.map(gp => gp.lat).filter(val => val != '').length;
-    const moyLng = GPS.map(gp => gp.lng).filter(val => val != '').reduce((sm, a) => sm + a, 0) / GPS.map(gp => gp.lng).filter(val => val != '').length;
+    const moyLat = [...Object.values(GPS)].map(gp => gp.lat).filter(val => val != '').reduce((sm, a) => sm + a, 0) / [...Object.values(GPS)].map(gp => gp.lat).filter(val => val != '').length;
+    const moyLng = [...Object.values(GPS)].map(gp => gp.lng).filter(val => val != '').reduce((sm, a) => sm + a, 0) / [...Object.values(GPS)].map(gp => gp.lng).filter(val => val != '').length;
     map.setView([moyLat, moyLng], 13);
 }
 
@@ -173,16 +177,18 @@ function getDataFromAPI(range = 'day') {
         default:
             break;
     }
-    fetch(`https://lab-rey.fr/data/${start}`)
+    fetch(`${URL_API}/data/${start}`)
         .then((data) => data.json())
         .then((data) => {
-            console.log(data);
             timestamp.push(...data.data.map(value => new Date(value.timestamp).toLocaleString()));
             humdata.push(...data.data.map(value => value.Weather.humidity))
             tempdata.push(...data.data.map(value => value.Weather.temperature))
             pressdata.push(...data.data.map(value => value.Weather.pressure))
             altdata.push(...data.data.map(value => value.GPS.alt))
-            GPS.push(...data.data.map(value => value.GPS));
+            data.data.forEach(mesuresEtGps => {
+                if (mesuresEtGps.GPS.lat != "")
+                    GPS[mesuresEtGps.id] = mesuresEtGps.GPS;
+            });
             // Update de tous les graphs
             refreshCharts();
             refreshGPS();
@@ -254,7 +260,6 @@ function getDiffDates(dateNow, dateFuture = new Date()) {
     return { days, hours, minutes, seconds }
 }
 
-
 function updateLastInfos(data) {
     affichageMeteo(data.Weather);
     affichageSat(data.GPS.nbSat);
@@ -265,7 +270,7 @@ function updateLastInfos(data) {
     setInterval(updateAllMajTimer, 1000);
 }
 
-fetch(`https://lab-rey.fr/last-infos`)
+fetch(`${URL_API}/last-infos`)
     .then((data) => data.json())
     .then((data) => {
         updateLastInfos(data);
